@@ -2,7 +2,7 @@
 // Layout: Right Panel (polished with panel transitions)
 // ──────────────────────────────────────────────
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
-import { X, Users, BookOpen, FileText, Link, Sparkles, Settings, VenetianMask, Bot, Puzzle } from "lucide-react";
+import { Users, BookOpen, FileText, Link, Sparkles, Settings, VenetianMask, Bot, Puzzle } from "lucide-react";
 import { useUIStore } from "../../stores/ui.store";
 import { cn } from "../../lib/utils";
 import { usePersonalExtensionContributions } from "../../lib/personal-extension-contributions";
@@ -75,6 +75,61 @@ const PANELS: Record<string, LazyExoticComponent<ComponentType>> = {
   extensions: PersonalExtensionPanel,
 };
 
+type RightPanelButtonPanel = "lorebooks" | "presets" | "connections" | "agents" | "personas" | "settings";
+
+type RightPanelButtonConfig = {
+  panel: RightPanelButtonPanel;
+  icon: any;
+  label: string;
+  gradientClass: string;
+  underlineClass?: string;
+};
+
+const RIGHT_PANEL_BUTTONS: readonly RightPanelButtonConfig[] = [
+  {
+    panel: "personas" as const,
+    icon: VenetianMask,
+    label: "Personas",
+    gradientClass: "mari-panel-gradient--personas",
+  },
+  {
+    panel: "lorebooks" as const,
+    icon: BookOpen,
+    label: "Lorebooks",
+    gradientClass: "mari-panel-gradient--lorebooks",
+  },
+  {
+    panel: "presets" as const,
+    icon: FileText,
+    label: "Presets",
+    gradientClass: "mari-panel-gradient--presets",
+    underlineClass: "mari-panel-gradient-surface mari-panel-gradient--presets",
+  },
+  {
+    panel: "connections" as const,
+    icon: Link,
+    label: "Connections",
+    gradientClass: "mari-panel-gradient--connections",
+  },
+  {
+    panel: "agents" as const,
+    icon: Sparkles,
+    label: "Agents",
+    gradientClass: "mari-panel-gradient--agents",
+  },
+  {
+    panel: "settings" as const,
+    icon: Settings,
+    label: "Settings",
+    gradientClass: "mari-panel-gradient--settings",
+  }
+] as const;
+
+const TOPBAR_PANEL_BUTTON_CLASS =
+  "mari-topbar-action relative flex h-8 w-8 items-center justify-center rounded-lg p-0 transition-all duration-200 max-sm:h-7 max-sm:w-7";
+const TOPBAR_ACTIVE_BUTTON_CLASS = "bg-[var(--accent)] shadow-sm";
+const TOPBAR_ACCENT_ICON_CLASS = "mari-topbar-accent-icon mari-accent-animated";
+
 const PANEL_CONTRIBUTION_SURFACES: Partial<Record<string, Exclude<PersonalExtensionContributionSurface, "top-bar">>> = {
   "bot-browser": "bots",
   characters: "characters",
@@ -91,17 +146,12 @@ const mountedPanels = new Set<string>();
 
 function PanelFallback() {
   const { t: localizeUi } = useUiTranslation();
-  return (
-    <div className="mari-chrome-text-muted flex h-full items-center justify-center text-sm">
-      {localizeUi("ui.characters.characterlibraryview.loading")}
-    </div>
-  );
+  return <div className="mari-chrome-text-muted flex h-full items-center justify-center text-sm">{localizeUi("ui.characters.characterlibraryview.loading")}</div>;
 }
 
 export function RightPanel() {
   const { t: localizeUi } = useUiTranslation();
   const panel = useUIStore((s) => s.rightPanel);
-  const close = useUIStore((s) => s.closeRightPanel);
   const { contributions, activePanelKey } = usePersonalExtensionContributions();
 
   // Add synchronously so the current panel is in the set for this render.
@@ -126,7 +176,42 @@ export function RightPanel() {
       aria-label={config.title}
       className="mari-right-panel-content mari-chrome-token-scope flex h-full min-h-0 flex-col"
     >
-      {/* Header - OS window style */}
+      {/* Navigation Header (Moved from TopBar) */}
+      <div className="mari-right-panel-header mari-topbar relative flex h-12 flex-shrink-0 items-center bg-[var(--card)]/80 px-4 backdrop-blur-sm">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--border)]/30" />
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto no-scrollbar justify-center">
+          {RIGHT_PANEL_BUTTONS.map(({ panel: panelKey, icon: Icon, label, gradientClass, underlineClass }) => {
+            const isActive = panel === panelKey;
+            return (
+              <button
+                key={panelKey}
+                onClick={() => useUIStore.getState().openRightPanel(panelKey)}
+                className={cn(
+                  TOPBAR_PANEL_BUTTON_CLASS,
+                  "mari-topbar-panel-icon",
+                  gradientClass,
+                  isActive && cn(TOPBAR_ACTIVE_BUTTON_CLASS, "mari-topbar-panel-icon--active"),
+                  !isActive && "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)] hover:bg-[var(--accent)]"
+                )}
+                title={localizeUi(label)}
+                aria-label={localizeUi(label)}
+              >
+                <Icon size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
+                {isActive && (
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full",
+                      underlineClass ?? cn("mari-panel-gradient-surface", gradientClass),
+                    )}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Content Header (Old Header) */}
       <div className="mari-right-panel-header relative flex h-12 flex-shrink-0 items-center justify-between bg-[var(--card)]/80 px-4 backdrop-blur-sm">
         <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--border)]/30" />
         <div className="flex min-w-0 items-center gap-2.5">
@@ -144,15 +229,12 @@ export function RightPanel() {
         </div>
         <div className="flex min-w-0 shrink-0 items-center gap-1">
           {contributionSurface && (
-            <PersonalExtensionContributionSlot surface={contributionSurface} position="header" className="max-w-28" />
+            <PersonalExtensionContributionSlot
+              surface={contributionSurface}
+              position="header"
+              className="max-w-28"
+            />
           )}
-          <button
-            onClick={close}
-            aria-label={localizeUi("ui.layout.rightpanel.closePanel")}
-            className="mari-chrome-control mari-chrome-control--small mari-accent-animated shrink-0 p-1.5 active:scale-90"
-          >
-            <X size="0.875rem" />
-          </button>
         </div>
       </div>
 

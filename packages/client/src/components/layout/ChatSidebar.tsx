@@ -27,7 +27,7 @@ import {
   PhoneIncoming,
 } from "lucide-react";
 import { useBulkExportChats, useChats, useCreateChat, useDeleteChat, useDeleteChatGroup } from "../../hooks/use-chats";
-import { useChatPresets, useApplyChatPreset } from "../../hooks/use-chat-presets";
+import { useChatPresets } from "../../hooks/use-chat-presets";
 import { useConnections } from "../../hooks/use-connections";
 import {
   useChatFolders,
@@ -215,7 +215,7 @@ function ChatSidebarTitleIcon() {
   );
 }
 
-export function ChatSidebar() {
+export function ChatSidebar({ characterFilterId }: { characterFilterId?: string }) {
   const { t: localizeUi } = useUiTranslation();
   const { t } = useTranslation();
   const localize = useLocalizedUiText();
@@ -223,7 +223,6 @@ export function ChatSidebar() {
   const { data: connections } = useConnections();
   const createChat = useCreateChat();
   const { data: chatPresetsData } = useChatPresets();
-  const applyChatPreset = useApplyChatPreset();
   const deleteChat = useDeleteChat();
   const deleteChatGroup = useDeleteChatGroup();
   const bulkExportChats = useBulkExportChats();
@@ -332,9 +331,9 @@ export function ChatSidebar() {
   const modeChats = useMemo(
     () =>
       (chats ?? []).filter(
-        (chat) => chat.mode === activeTab && !(chat.mode === "conversation" && chat.metadata?.gameId),
+        (chat) => chat.mode === activeTab && !(chat.mode === "conversation" && chat.metadata?.gameId) && (!characterFilterId || chat.characterIds?.includes(characterFilterId)),
       ),
-    [chats, activeTab],
+    [chats, activeTab, characterFilterId],
   );
   const sidebarCharacterIds = useMemo(() => {
     const ids = new Set<string>();
@@ -635,56 +634,111 @@ export function ChatSidebar() {
   const handleNewChat = useCallback(
     (mode: ChatMode) => {
       if (createChat.isPending) return;
-      const connectionRows = ((connections ?? []) as Array<{ id: string }>).filter((connection) => !!connection.id);
-      if (connectionRows.length === 0) {
-        setPendingNewChatMode(mode, "sidebar");
-        if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
+
+      if (!characterFilterId) {
+        // Original behavior when no character is selected
+        const connectionRows = ((connections ?? []) as Array<{ id: string }>).filter((connection) => !!connection.id);
+        if (connectionRows.length === 0) {
+          setPendingNewChatMode(mode, "sidebar");
+          if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
+          return;
+        }
+
+        // Close any open detail editors so the chat area is visible
+        if (hasAnyDetailOpen()) {
+          closeAllDetails();
+        }
+        // Resolve the user's starred default settings profile for this mode.
+        const presets = chatPresetsData ?? [];
+        const presetMode: ChatMode | null = mode === "conversation" || mode === "roleplay" ? mode : null;
+        const starred = presetMode
+          ? (presets.find((p) => p.mode === presetMode && p.isActive && !p.isDefault) ?? null)
+          : null;
+        createChat.mutate(
+          {
+            name: `New ${MODE_CONFIG[mode]?.label ?? mode}`,
+            mode,
+            characterIds: [],
+            connectionId: starred?.settings.connectionId ?? undefined,
+            promptPresetId: starred?.settings.promptPresetId ?? undefined,
+          },
+          {
+            onSuccess: (chat) => {
+              const store = useChatStore.getState();
+              store.setActiveChatId(chat.id);
+              store.setShouldOpenSettings(true);
+              store.setShouldOpenWizard(true);
+              store.setShouldOpenWizardInShortcutMode(false);
+              if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
+            },
+          },
+        );
         return;
       }
 
-      // Close any open detail editors so the chat area is visible
+      // New behavior: a character is selected
+      // 1. Close detail editors
       if (hasAnyDetailOpen()) {
         closeAllDetails();
       }
-      // Resolve the user's starred default settings profile for this mode.
+
+      // 2. Resolve default preset and connection
       const presets = chatPresetsData ?? [];
       const presetMode: ChatMode | null = mode === "conversation" || mode === "roleplay" ? mode : null;
-      const starred = presetMode
-        ? (presets.find((p) => p.mode === presetMode && p.isActive && !p.isDefault) ?? null)
-        : null;
+      // "the default prompt must be selected when making a new convo/roleplay/game with a selected character in prompt preset."
+      const defaultPreset = presetMode ? presets.find((p) => p.mode === presetMode && p.isDefault) : null;
+
+      // 3. Name format: Date@Time
+      const date = new Date();
+      const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}@${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      const chatName = formattedDate;
+
+      // 4. Find the last persona used with this character
+      let lastPersonaId: string | null | undefined = undefined;
+      if (chats) {
+        const charChats = chats.filter(c => c.characterIds?.includes(characterFilterId));
+        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        const lastChatWithPersona = charChats.find(c => c.personaId);
+        if (lastChatWithPersona) {
+          lastPersonaId = lastChatWithPersona.personaId;
+        }
+      }
+
+      // Create the chat without showing any setup popup (except enable agents wizard logic if needed)
       createChat.mutate(
         {
-          name: `New ${MODE_CONFIG[mode]?.label ?? mode}`,
+          name: chatName,
           mode,
-          characterIds: [],
-          connectionId: starred?.settings.connectionId ?? undefined,
-          promptPresetId: starred?.settings.promptPresetId ?? undefined,
+          characterIds: [characterFilterId],
+          connectionId: undefined, // "connection should be the main default"
+          promptPresetId: defaultPreset?.id,
+          personaId: lastPersonaId,
         },
         {
           onSuccess: (chat) => {
-            setActiveChatId(chat.id);
+            const store = useChatStore.getState();
+            store.setActiveChatId(chat.id);
+            // The prompt asks for "the only popup that should remain is the enable agents."
+            store.setShouldOpenWizard(true);
+            store.setShouldOpenWizardInShortcutMode(false);
+            // Settings drawer is omitted because user said "no popup should come up... the only popup that should remain is the enable agents"
+            store.setShouldOpenSettings(false);
             if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
-            useChatStore.getState().setShouldOpenSettings(true);
-            useChatStore.getState().setShouldOpenWizard(true);
-            if (starred) {
-              void applyChatPreset.mutateAsync({ presetId: starred.id, chatId: chat.id }).catch(() => {
-                /* non-fatal — chat still opens with system defaults */
-              });
-            }
           },
         },
       );
     },
     [
-      connections,
       createChat,
-      setActiveChatId,
+      connections,
       setPendingNewChatMode,
-      setSidebarOpen,
       hasAnyDetailOpen,
       closeAllDetails,
       chatPresetsData,
-      applyChatPreset,
+      setSidebarOpen,
+      characterFilterId,
+      charLookup,
+      chats,
     ],
   );
 
@@ -853,6 +907,36 @@ export function ChatSidebar() {
   );
 
   // ── Batch actions ──
+  const performChatDelete = useCallback((chatId: string, chatMode?: string) => {
+    if (activeChatId === chatId && characterFilterId && chatMode) {
+      const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId);
+      if (charChats.length === 0) {
+        useUIStore.getState().openModal("start-character-chat", {
+          characterId: characterFilterId,
+          characterName: charLookup.get(characterFilterId)?.name ?? "Unnamed",
+          onDeleteChatId: chatId,
+        });
+        return;
+      }
+    }
+
+    deleteChat.mutate({ id: chatId, force: true });
+    
+    if (activeChatId === chatId) {
+      if (!characterFilterId || !chatMode) {
+        setActiveChatId(null);
+      } else {
+        const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId);
+        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        if (charChats.length > 0) {
+          setActiveChatId(charChats[0].id);
+        } else {
+          setActiveChatId(null);
+        }
+      }
+    }
+  }, [activeChatId, characterFilterId, chats, charLookup, deleteChat, setActiveChatId]);
+
   const handleBatchDelete = useCallback(async () => {
     if (selectedChatIds.size === 0) return;
     if (
@@ -868,12 +952,16 @@ export function ChatSidebar() {
     ) {
       return;
     }
-    for (const id of selectedChatIds) {
-      deleteChat.mutate({ id, force: true });
-    }
-    if (activeChatId && selectedChatIds.has(activeChatId)) setActiveChatId(null);
-    exitMultiSelect();
-  }, [selectedChatIds, deleteChat, activeChatId, setActiveChatId, exitMultiSelect, localizeUi]);
+      for (const id of selectedChatIds) {
+        if (id === activeChatId) {
+          const activeChatMode = chats?.find(c => c.id === activeChatId)?.mode;
+          performChatDelete(id, activeChatMode);
+        } else {
+          deleteChat.mutate({ id, force: true });
+        }
+      }
+      exitMultiSelect();
+    }, [selectedChatIds, deleteChat, activeChatId, performChatDelete, chats, exitMultiSelect, localizeUi]);
 
   const handleBatchExport = useCallback(async () => {
     if (selectedChatIds.size === 0) return;
@@ -1248,17 +1336,16 @@ export function ChatSidebar() {
                   branchCount,
                 });
               } else {
-                if (
-                  await showConfirmDialog({
-                    title: localizeUi("ui.layout.chatsidebar.deleteChat"),
-                    message: localizeUi("dialog.delete.namedPermanent", { name: chat.name }),
-                    confirmLabel: localizeUi("lorebook.editor.batch.delete"),
-                    tone: "destructive",
-                  })
-                ) {
-                  deleteChat.mutate({ id: chat.id, force: true });
-                  if (activeChatId === chat.id) setActiveChatId(null);
-                }
+                  if (
+                    await showConfirmDialog({
+                      title:localizeUi("ui.layout.chatsidebar.deleteChat"),
+                      message: localizeUi("dialog.delete.namedPermanent", { name: chat.name }),
+                      confirmLabel:localizeUi("lorebook.editor.batch.delete"),
+                      tone: "destructive",
+                    })
+                  ) {
+                    performChatDelete(chat.id, chat.mode);
+                  }
               }
             }}
             className="shrink-0 rounded-md p-1 text-[var(--muted-foreground)] opacity-0 transition-all hover:bg-[var(--accent)] hover:text-[var(--foreground)] group-hover:opacity-100 max-md:opacity-100"
@@ -1676,26 +1763,39 @@ export function ChatSidebar() {
                 })}
               </p>
             </div>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  deleteChat.mutate({ id: deleteTarget.chatId, force: true });
-                  if (activeChatId === deleteTarget.chatId) setActiveChatId(null);
-                  setDeleteTarget(null);
-                }}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    const deletedChatMode = chats?.find(c => c.id === deleteTarget.chatId)?.mode;
+                    performChatDelete(deleteTarget.chatId, deletedChatMode);
+                    setDeleteTarget(null);
+                  }}
                 className="mari-chrome-control mari-chrome-control--primary w-full text-xs"
               >
                 <Trash2 size="0.8125rem" />
                 {localizeUi("ui.layout.chatsidebar.deleteThisBranchOnly")}
               </button>
-              <button
-                onClick={() => {
-                  if (deleteTarget.groupId) {
-                    deleteChatGroup.mutate({ groupId: deleteTarget.groupId, force: true });
-                    if (activeGroupId === deleteTarget.groupId) setActiveChatId(null);
-                  }
-                  setDeleteTarget(null);
-                }}
+                <button
+                  onClick={() => {
+                    if (deleteTarget.groupId) {
+                      deleteChatGroup.mutate({ groupId: deleteTarget.groupId, force: true });
+                      if (activeGroupId === deleteTarget.groupId && activeChatId) {
+                        const activeChatMode = chats?.find(c => c.id === activeChatId)?.mode;
+                        if (characterFilterId && activeChatMode) {
+                          const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === activeChatMode && c.groupId !== deleteTarget.groupId);
+                          charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                          if (charChats.length > 0) {
+                            setActiveChatId(charChats[0].id);
+                          } else {
+                            setActiveChatId(null);
+                          }
+                        } else {
+                          setActiveChatId(null);
+                        }
+                      }
+                    }
+                    setDeleteTarget(null);
+                  }}
                 className="mari-chrome-control mari-chrome-control--primary w-full text-xs"
               >
                 <Trash2 size="0.8125rem" />

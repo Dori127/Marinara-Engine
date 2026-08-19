@@ -1,18 +1,7 @@
 // ──────────────────────────────────────────────
 // Layout: Top Bar (polished, with hover glow)
 // ──────────────────────────────────────────────
-import {
-  MessageSquareText,
-  Home,
-  Settings,
-  Link,
-  BookOpen,
-  Users,
-  Sparkles,
-  FileText,
-  VenetianMask,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Home, Menu } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useUIStore } from "../../stores/ui.store";
 import { useChatStore } from "../../stores/chat.store";
@@ -23,159 +12,110 @@ import { LocalMusicPlayer } from "../chat/LocalMusicPlayer";
 import { MusicDjUnavailablePlayer } from "../music/MusicDjUnavailablePlayer";
 import { useInstalledCapabilityPackages } from "../../hooks/use-capability-packages";
 import { useLocalizedUiText } from "../../localization/use-localized-ui-text";
-import {
-  PersonalExtensionContributionsMenu,
-  PersonalExtensionTopbarButtons,
-} from "./PersonalExtensionContributionsMenu";
+import { PersonalExtensionContributionsMenu, PersonalExtensionTopbarButtons } from "./PersonalExtensionContributionsMenu";
+import { useCharacters } from "../../hooks/use-characters";
+import { ChatSidebar } from "./ChatSidebar";
+import { CharactersPanel } from "../panels/CharactersPanel";
 
-type RightPanelButtonPanel = "lorebooks" | "presets" | "connections" | "agents" | "personas";
+import "./TopBar.css";
 
-type RightPanelButtonConfig = {
-  panel: RightPanelButtonPanel;
-  icon: LucideIcon;
-  label: string;
-  gradientClass: string;
-  underlineClass?: string;
-};
-
-const RIGHT_PANEL_BUTTONS: readonly RightPanelButtonConfig[] = [
-  {
-    panel: "personas" as const,
-    icon: VenetianMask,
-    label: "Personas",
-    gradientClass: "mari-panel-gradient--personas",
-  },
-  {
-    panel: "lorebooks" as const,
-    icon: BookOpen,
-    label: "Lorebooks",
-    gradientClass: "mari-panel-gradient--lorebooks",
-  },
-  {
-    panel: "presets" as const,
-    icon: FileText,
-    label: "Presets",
-    gradientClass: "mari-panel-gradient--presets",
-    underlineClass: "mari-panel-gradient-surface mari-panel-gradient--presets",
-  },
-  {
-    panel: "connections" as const,
-    icon: Link,
-    label: "Connections",
-    gradientClass: "mari-panel-gradient--connections",
-  },
-  {
-    panel: "agents" as const,
-    icon: Sparkles,
-    label: "Agents",
-    gradientClass: "mari-panel-gradient--agents",
-  },
-] as const;
-
-const SPOTIFY_TOPBAR_MIN_WIDTH = 320;
-const SPOTIFY_TOPBAR_MIN_WIDTH_WITH_VOLUME = 416;
-const SPOTIFY_TOPBAR_LAYOUT_BUFFER = 32;
-const TOPBAR_BUTTON_CLASS =
-  "mari-topbar-action relative flex h-8 w-8 items-center justify-center rounded-lg p-0 transition-all hover:bg-[var(--accent)] active:scale-95 max-sm:h-7 max-sm:w-7";
 const TOPBAR_PANEL_BUTTON_CLASS =
   "mari-topbar-action relative flex h-8 w-8 items-center justify-center rounded-lg p-0 transition-all duration-200 max-sm:h-7 max-sm:w-7";
 const TOPBAR_ACTIVE_BUTTON_CLASS = "bg-[var(--accent)] shadow-sm";
 const TOPBAR_FORCE_HOVER_CLASS = "bg-[var(--accent)]";
 const TOPBAR_ACCENT_ICON_CLASS = "mari-topbar-accent-icon mari-accent-animated";
-const CHAT_TOPBAR_GRADIENT_ID = "mari-topbar-chats-gradient";
+const TOPBAR_BUTTON_CLASS =
+  "mari-topbar-action relative flex h-8 w-8 items-center justify-center rounded-lg p-0 transition-all hover:bg-[var(--accent)] active:scale-95 max-sm:h-7 max-sm:w-7";
+
+const SPOTIFY_TOPBAR_MIN_WIDTH = 320;
+const SPOTIFY_TOPBAR_MIN_WIDTH_WITH_VOLUME = 416;
+const SPOTIFY_TOPBAR_LAYOUT_BUFFER = 32;
 
 function isMobileTopbarNavigation() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 }
 
+const REVERSE_MODE_MAP: Record<string, string> = {
+  conversation: "CONVO",
+  roleplay: "RP",
+  game: "GM",
+};
+
 export function TopBar() {
   const localize = useLocalizedUiText();
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const toggleRightPanel = useUIStore((s) => s.toggleRightPanel);
-  const rightPanel = useUIStore((s) => s.rightPanel);
   const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
   const activeChatId = useChatStore((s) => s.activeChatId);
   const setActiveChatId = useChatStore((s) => s.setActiveChatId);
+  const activeChat = useChatStore((s) => s.activeChat);
   const closeAllDetails = useUIStore((s) => s.closeAllDetails);
+  
   const characterDetailId = useUIStore((s) => s.characterDetailId);
-  const lorebookDetailId = useUIStore((s) => s.lorebookDetailId);
-  const presetDetailId = useUIStore((s) => s.presetDetailId);
-  const connectionDetailId = useUIStore((s) => s.connectionDetailId);
-  const agentDetailId = useUIStore((s) => s.agentDetailId);
-  const toolDetailId = useUIStore((s) => s.toolDetailId);
-  const personaDetailId = useUIStore((s) => s.personaDetailId);
-  const regexDetailId = useUIStore((s) => s.regexDetailId);
-  const botBrowserOpen = useUIStore((s) => s.botBrowserOpen);
-  const gameAssetsBrowserOpen = useUIStore((s) => s.gameAssetsBrowserOpen);
-  const musicPlayerEnabled = useUIStore((s) => s.musicPlayerEnabled);
   const characterLibraryOpen = useUIStore((s) => s.characterLibraryOpen);
-  const cardLibraryKind = useUIStore((s) => s.cardLibraryKind);
+  const activeModal = useUIStore((s) => s.modal);
+
   const headerRef = useRef<HTMLElement | null>(null);
-  const leftControlsRef = useRef<HTMLDivElement | null>(null);
-  const rightNavRef = useRef<HTMLElement | null>(null);
   const [spotifyDesktopViewport, setSpotifyDesktopViewport] = useState(false);
   const [spotifyUseFloatingFallback, setSpotifyUseFloatingFallback] = useState(false);
   const [hoveredTopbarKey, setHoveredTopbarKey] = useState<string | null>(null);
-  const { data: installedCapabilities = [], isLoading: installedCapabilitiesLoading } =
-    useInstalledCapabilityPackages();
-  const musicDjInstalled = installedCapabilities.some(
-    (capability) => capability.id === "spotify" && capability.status === "active",
-  );
-  const showMusicDjUnavailablePlayer =
-    spotifyDesktopViewport && musicPlayerEnabled && !installedCapabilitiesLoading && !musicDjInstalled;
+  
+  const { data: installedCapabilities = [], isLoading: installedCapabilitiesLoading } = useInstalledCapabilityPackages();
+  const musicPlayerEnabled = useUIStore((s) => s.musicPlayerEnabled);
+  const musicDjInstalled = installedCapabilities.some((capability) => capability.id === "spotify" && capability.status === "active");
+  const showMusicDjUnavailablePlayer = spotifyDesktopViewport && musicPlayerEnabled && !installedCapabilitiesLoading && !musicDjInstalled;
 
-  const isCharactersPanelActive =
-    (rightPanelOpen && rightPanel === "characters") ||
-    Boolean(characterDetailId) ||
-    (characterLibraryOpen && cardLibraryKind === "characters");
-  const panelContextActive: Record<RightPanelButtonPanel, boolean> = {
-    lorebooks: (rightPanelOpen && rightPanel === "lorebooks") || Boolean(lorebookDetailId),
-    presets:
-      (rightPanelOpen && rightPanel === "presets") ||
-      Boolean(presetDetailId) ||
-      Boolean(regexDetailId) ||
-      Boolean(toolDetailId),
-    connections: (rightPanelOpen && rightPanel === "connections") || Boolean(connectionDetailId),
-    agents: (rightPanelOpen && rightPanel === "agents") || Boolean(agentDetailId),
-    personas:
-      (rightPanelOpen && rightPanel === "personas") ||
-      Boolean(personaDetailId) ||
-      (characterLibraryOpen && cardLibraryKind === "personas"),
-  };
   const isHomeActive =
     !activeChatId &&
     !characterDetailId &&
-    !lorebookDetailId &&
-    !presetDetailId &&
-    !connectionDetailId &&
-    !agentDetailId &&
-    !toolDetailId &&
-    !personaDetailId &&
-    !regexDetailId &&
-    !botBrowserOpen &&
-    !gameAssetsBrowserOpen &&
+    !activeModal &&
     !characterLibraryOpen;
 
   const isTopbarHovered = (key: string) => hoveredTopbarKey === key;
+
+  // Popups state
+  const [isCharacterPopupOpen, setIsCharacterPopupOpen] = useState(false);
+  const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
+  
+  // Chat / Character lists
+  const { data: rawCharactersData = [] } = useCharacters();
+  const charactersData = rawCharactersData as Array<{ id: string; data?: any; avatarPath?: string | null }>;
+  
+  const currentCharacterId = activeChat?.characterIds?.[0];
+  const currentCharacter = charactersData.find(c => c.id === currentCharacterId);
+  let currentCharacterName = "Select Character";
+  try {
+    if (currentCharacter) {
+      const currentCharacterParsed = typeof currentCharacter.data === "string" ? JSON.parse(currentCharacter.data) : currentCharacter.data;
+      currentCharacterName = currentCharacterParsed?.name ?? currentCharacterName;
+    }
+  } catch {
+    // Ignore parse error
+  }
+  
+  const currentChatModeStr = activeChat ? REVERSE_MODE_MAP[activeChat.mode] : "---";
+  const currentChatName = activeChat?.name ?? "No Chat Active";
+
+  const toggleCharacterPopup = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsChatPopupOpen(false);
+    setIsCharacterPopupOpen(prev => !prev);
+  };
+
+  const toggleChatPopup = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCharacterPopupOpen(false);
+    setIsChatPopupOpen(prev => !prev);
+  };
+
+  const closePopups = useCallback(() => {
+    setIsCharacterPopupOpen(false);
+    setIsChatPopupOpen(false);
+  }, []);
 
   const prepareMobileTopbarNavigation = useCallback(() => {
     if (!isMobileTopbarNavigation()) return;
     closeAllDetails();
   }, [closeAllDetails]);
-
-  const handleSidebarClick = useCallback(() => {
-    prepareMobileTopbarNavigation();
-    toggleSidebar();
-  }, [prepareMobileTopbarNavigation, toggleSidebar]);
-
-  const handleRightPanelClick = useCallback(
-    (panel: Parameters<typeof toggleRightPanel>[0]) => {
-      prepareMobileTopbarNavigation();
-      toggleRightPanel(panel);
-    },
-    [prepareMobileTopbarNavigation, toggleRightPanel],
-  );
 
   const handleTopbarPointerOver = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType !== "mouse") return;
@@ -190,11 +130,20 @@ export function TopBar() {
 
   const clearTopbarHover = useCallback(() => setHoveredTopbarKey(null), []);
 
+  const handleRightPanelClick = useCallback((panel: Parameters<typeof toggleRightPanel>[0]) => {
+    prepareMobileTopbarNavigation();
+    toggleRightPanel(panel);
+  }, [prepareMobileTopbarNavigation, toggleRightPanel]);
+
+  useEffect(() => {
+    const handleDocumentClick = () => closePopups();
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, [closePopups]);
+
   useEffect(() => {
     const header = headerRef.current;
-    const leftControls = leftControlsRef.current;
-    const rightNav = rightNavRef.current;
-    if (!header || !leftControls || !rightNav) return;
+    if (!header) return;
 
     const measureSpotifyFit = () => {
       const desktop = window.matchMedia("(min-width: 768px)").matches;
@@ -204,30 +153,24 @@ export function TopBar() {
         setSpotifyUseFloatingFallback(false);
         return;
       }
-
-      const headerWidth = header.getBoundingClientRect().width;
-      const leftControlsWidth = leftControls.getBoundingClientRect().width;
-      const rightNavWidth = rightNav.getBoundingClientRect().width;
+      
       const minPlayerWidth = window.matchMedia("(min-width: 1024px)").matches
         ? SPOTIFY_TOPBAR_MIN_WIDTH_WITH_VOLUME
         : SPOTIFY_TOPBAR_MIN_WIDTH;
 
+      const rightNavWidth = 150; // approximate
+      const leftNavWidth = 520; // approximate width of character and chat buttons
+      
+      const headerWidth = header.getBoundingClientRect().width;
       setSpotifyUseFloatingFallback(
-        headerWidth < leftControlsWidth + rightNavWidth + minPlayerWidth + SPOTIFY_TOPBAR_LAYOUT_BUFFER,
+        headerWidth < leftNavWidth + rightNavWidth + minPlayerWidth + SPOTIFY_TOPBAR_LAYOUT_BUFFER,
       );
     };
 
     measureSpotifyFit();
 
-    const observer =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => {
-            measureSpotifyFit();
-          });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measureSpotifyFit());
     observer?.observe(header);
-    observer?.observe(leftControls);
-    observer?.observe(rightNav);
     window.addEventListener("resize", measureSpotifyFit);
 
     return () => {
@@ -235,6 +178,10 @@ export function TopBar() {
       window.removeEventListener("resize", measureSpotifyFit);
     };
   }, []);
+
+  useEffect(() => {
+    closePopups();
+  }, [activeChatId, characterDetailId, activeModal, closePopups]);
 
   useEffect(() => {
     const clearWhenHidden = () => {
@@ -256,53 +203,12 @@ export function TopBar() {
       data-component="TopBar"
       onPointerLeave={clearTopbarHover}
       onPointerOver={handleTopbarPointerOver}
-      className="mari-topbar relative z-10 flex h-12 flex-shrink-0 items-center justify-between bg-[var(--marinara-topbar-surface)] px-3 backdrop-blur-sm"
+      className="mari-topbar mari-new-top-bar"
     >
-      {/* Subtle bottom border only */}
-      <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--marinara-topbar-border)]" />
+      <div className={cn("mari-new-backdrop", (isCharacterPopupOpen || isChatPopupOpen) && "active")} onClick={closePopups} />
 
-      {/* Left section: window controls + chat info */}
-      <div className="mari-topbar-left flex min-w-0 flex-1 items-center gap-2">
-        <div
-          ref={leftControlsRef}
-          className="mari-topbar-left-controls mari-rgb-icon-scope flex shrink-0 items-center gap-2"
-        >
-          <button
-            onClick={handleSidebarClick}
-            data-tour="sidebar-toggle"
-            data-topbar-hover-key="chats"
-            className={cn(
-              TOPBAR_BUTTON_CLASS,
-              sidebarOpen
-                ? cn(TOPBAR_ACTIVE_BUTTON_CLASS, "mari-topbar-chat-gradient-icon")
-                : cn(
-                    "mari-topbar-chat-gradient-hover text-[var(--muted-foreground)]",
-                    isTopbarHovered("chats") && cn(TOPBAR_FORCE_HOVER_CLASS, "mari-topbar-chat-gradient-icon"),
-                  ),
-            )}
-            title={localize("Chats")}
-          >
-            <MessageSquareText size={15} className={TOPBAR_ACCENT_ICON_CLASS}>
-              <defs>
-                <linearGradient
-                  id={CHAT_TOPBAR_GRADIENT_ID}
-                  x1="2"
-                  x2="18"
-                  y1="3"
-                  y2="18"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop offset="0%" stopColor="var(--mari-logo-cyan)" />
-                  <stop offset="48%" stopColor="var(--mari-logo-orange)" />
-                  <stop offset="100%" stopColor="var(--mari-logo-pink)" />
-                </linearGradient>
-              </defs>
-            </MessageSquareText>
-            {sidebarOpen && (
-              <span className="mari-topbar-chat-gradient-underline absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full" />
-            )}
-          </button>
-
+      {/* Left controls: Home */}
+      <div className="relative z-[999] flex shrink-0 items-center gap-2 pr-2 border-r border-[var(--border)]">
           <button
             onClick={() => {
               window.dispatchEvent(new Event("marinara:home-professor-mari-close"));
@@ -327,7 +233,50 @@ export function TopBar() {
               <span className="mari-topbar-active-underline absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full" />
             )}
           </button>
+      </div>
+
+      {/* Character Button */}
+      <div 
+        className={cn("mari-new-top-bar-btn character-btn", isCharacterPopupOpen && "active")} 
+        onClick={toggleCharacterPopup}
+      >
+        <div className="mari-new-character-avatar">
+          {currentCharacter?.avatarPath ? (
+            <img src={currentCharacter.avatarPath} alt="" />
+          ) : (
+            <div className="mari-new-character-avatar-placeholder">
+              {currentCharacter ? currentCharacterName.substring(0, 2).toUpperCase() : "---"}
+            </div>
+          )}
         </div>
+        <div className="mari-new-btn-text-container">
+          <span className="mari-new-truncated-text" title={currentCharacterName}>{currentCharacterName}</span>
+        </div>
+
+        {/* Character Popup */}
+        <div className={cn("mari-new-popup", isCharacterPopupOpen && "active")} onClick={(e) => e.stopPropagation()} style={{ height: "600px", padding: 0, overflow: "hidden" }}>
+            <CharactersPanel />
+        </div>
+      </div>
+
+      {/* Chat Mode Button */}
+      <div 
+        className={cn("mari-new-top-bar-btn chat-btn", isChatPopupOpen && "active")} 
+        onClick={toggleChatPopup}
+      >
+        <div className="mari-new-btn-text-container">
+            <span className="mari-new-chat-mode-label">{currentChatModeStr}</span>
+            <span className="mari-new-chat-separator">|</span>
+            <span className="mari-new-truncated-text" title={currentChatName}>{currentChatName}</span>
+        </div>
+
+        {/* Chat Popup */}
+        <div className={cn("mari-new-popup", isChatPopupOpen && "active")} onClick={(e) => e.stopPropagation()} style={{ height: "600px", padding: 0, overflow: "hidden" }}>
+            <ChatSidebar characterFilterId={currentCharacterId} />
+        </div>
+      </div>
+
+      <div className="relative z-[999] flex-1 flex justify-center min-w-0">
         {showMusicDjUnavailablePlayer ? (
           <MusicDjUnavailablePlayer floating={spotifyUseFloatingFallback} />
         ) : musicDjInstalled ? (
@@ -339,91 +288,31 @@ export function TopBar() {
         ) : null}
       </div>
 
-      {/* Right section - Panel toggles */}
+      {/* Right side icons */}
       <nav
-        ref={rightNavRef}
         data-tour="panel-buttons"
         aria-label={localize("Panel navigation")}
-        className="mari-topbar-panel-nav mari-rgb-icon-scope flex shrink-0 items-center justify-end gap-0.5 rounded-xl p-1 max-sm:gap-0 max-sm:p-0.5"
+        className="mari-topbar-panel-nav mari-rgb-icon-scope relative z-[999] flex shrink-0 items-center justify-end gap-0.5 rounded-xl p-1 max-sm:gap-0 max-sm:p-0.5 ml-auto"
       >
-        <button
-          onClick={() => handleRightPanelClick("characters")}
-          data-tour="panel-characters"
-          data-topbar-hover-key="characters"
-          className={cn(
-            TOPBAR_PANEL_BUTTON_CLASS,
-            isCharactersPanelActive
-              ? TOPBAR_ACTIVE_BUTTON_CLASS
-              : cn(
-                  "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]",
-                  isTopbarHovered("characters") &&
-                    cn(TOPBAR_FORCE_HOVER_CLASS, "text-[var(--marinara-chat-chrome-button-text-hover)]"),
-                ),
-          )}
-          title={localize("Characters")}
-        >
-          <Users size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
-          {isCharactersPanelActive && (
-            <span className="mari-topbar-active-underline absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full" />
-          )}
-        </button>
-
-        {RIGHT_PANEL_BUTTONS.map(({ panel, icon: Icon, label, gradientClass, underlineClass }) => {
-          const isActive = panelContextActive[panel];
-          const isHovered = isTopbarHovered(panel);
-          return (
-            <button
-              key={panel}
-              onClick={() => handleRightPanelClick(panel)}
-              data-tour={`panel-${panel}`}
-              data-topbar-hover-key={panel}
-              className={cn(
-                TOPBAR_PANEL_BUTTON_CLASS,
-                "mari-topbar-panel-icon",
-                gradientClass,
-                isHovered && cn(TOPBAR_FORCE_HOVER_CLASS, "mari-topbar-panel-icon--hovered"),
-                isActive && cn(TOPBAR_ACTIVE_BUTTON_CLASS, "mari-topbar-panel-icon--active"),
-              )}
-              title={localize(label)}
-            >
-              <Icon size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
-              {isActive && (
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full",
-                    underlineClass ?? cn("mari-panel-gradient-surface", gradientClass),
-                  )}
-                />
-              )}
-            </button>
-          );
-        })}
-
-        {/* Settings */}
-        <button
-          onClick={() => handleRightPanelClick("settings")}
-          data-tour="panel-settings"
-          data-topbar-hover-key="settings"
-          aria-pressed={rightPanelOpen && rightPanel === "settings"}
-          className={cn(
-            TOPBAR_PANEL_BUTTON_CLASS,
-            rightPanelOpen && rightPanel === "settings"
-              ? cn(TOPBAR_ACTIVE_BUTTON_CLASS, "text-gray-300")
-              : cn(
-                  "text-[var(--muted-foreground)] hover:text-gray-300",
-                  isTopbarHovered("settings") && cn(TOPBAR_FORCE_HOVER_CLASS, "text-gray-300"),
-                ),
-          )}
-          title={localize("Settings")}
-        >
-          <Settings size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
-          {rightPanelOpen && rightPanel === "settings" && (
-            <span className="absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full bg-gradient-to-r from-gray-400 to-gray-500" />
-          )}
-        </button>
-
         <PersonalExtensionTopbarButtons />
         <PersonalExtensionContributionsMenu />
+        
+        <button
+          onClick={() => {
+            if (rightPanelOpen) {
+              useUIStore.getState().closeRightPanel();
+            } else {
+              handleRightPanelClick("settings");
+            }
+          }}
+          className={cn(
+            TOPBAR_PANEL_BUTTON_CLASS,
+            rightPanelOpen ? cn(TOPBAR_ACTIVE_BUTTON_CLASS, "text-[var(--primary)]") : "text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+          )}
+          title={localize("Menu")}
+        >
+          <Menu size={20} />
+        </button>
       </nav>
     </header>
   );
