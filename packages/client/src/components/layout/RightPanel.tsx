@@ -122,7 +122,7 @@ const RIGHT_PANEL_BUTTONS: readonly RightPanelButtonConfig[] = [
     icon: Settings,
     label: "Settings",
     gradientClass: "mari-panel-gradient--settings",
-  }
+  },
 ] as const;
 
 const TOPBAR_PANEL_BUTTON_CLASS =
@@ -146,7 +146,11 @@ const mountedPanels = new Set<string>();
 
 function PanelFallback() {
   const { t: localizeUi } = useUiTranslation();
-  return <div className="mari-chrome-text-muted flex h-full items-center justify-center text-sm">{localizeUi("ui.characters.characterlibraryview.loading")}</div>;
+  return (
+    <div className="mari-chrome-text-muted flex h-full items-center justify-center text-sm">
+      {localizeUi("ui.characters.characterlibraryview.loading")}
+    </div>
+  );
 }
 
 export function RightPanel() {
@@ -191,7 +195,8 @@ export function RightPanel() {
                   "mari-topbar-panel-icon",
                   gradientClass,
                   isActive && cn(TOPBAR_ACTIVE_BUTTON_CLASS, "mari-topbar-panel-icon--active"),
-                  !isActive && "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)] hover:bg-[var(--accent)]"
+                  !isActive &&
+                    "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)] hover:bg-[var(--accent)]",
                 )}
                 title={localizeUi(label)}
                 aria-label={localizeUi(label)}
@@ -229,11 +234,7 @@ export function RightPanel() {
         </div>
         <div className="flex min-w-0 shrink-0 items-center gap-1">
           {contributionSurface && (
-            <PersonalExtensionContributionSlot
-              surface={contributionSurface}
-              position="header"
-              className="max-w-28"
-            />
+            <PersonalExtensionContributionSlot surface={contributionSurface} position="header" className="max-w-28" />
           )}
         </div>
       </div>

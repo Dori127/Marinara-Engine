@@ -16,6 +16,8 @@ import {
   useUpdateCharacter,
   useDuplicateCharacter,
 } from "../../hooks/use-characters";
+import { useChats } from "../../hooks/use-chats";
+import { useChatStore } from "../../stores/chat.store";
 import { api } from "../../lib/api-client";
 import { confirmNonEmptyFolderDelete, showChoiceDialog, showConfirmDialog } from "../../lib/app-dialogs";
 import {
@@ -37,8 +39,8 @@ import {
   Tag,
   Hash,
   Star,
-  MessageCircle,
   Bot,
+  Pencil,
 } from "lucide-react";
 import { getCharacterTitle } from "../../lib/character-display";
 import {
@@ -154,6 +156,8 @@ export function CharactersPanel() {
   const createGroup = useCreateGroup();
   const updateGroup = useUpdateGroup();
   const deleteGroup = useDeleteGroup();
+  const { data: allChats } = useChats();
+  const setActiveChatId = useChatStore((s) => s.setActiveChatId);
   const openModal = useUIStore((s) => s.openModal);
   const openCharacterDetail = useUIStore((s) => s.openCharacterDetail);
   const openCharacterLibrary = useUIStore((s) => s.openCharacterLibrary);
@@ -475,11 +479,22 @@ export function CharactersPanel() {
   );
 
   const openCharacterDetailFromPanel = useCallback(
-    (id: string) => {
+    (id: string, name: string) => {
       rememberPanelScroll();
-      openCharacterDetail(id);
+      if (allChats) {
+        const charChats = allChats.filter((c) => c.characterIds?.includes(id));
+        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        if (charChats.length > 0) {
+          setActiveChatId(charChats[0].id);
+          return;
+        }
+      }
+      openModal("start-character-chat", {
+        characterId: id,
+        characterName: name,
+      });
     },
-    [openCharacterDetail, rememberPanelScroll],
+    [rememberPanelScroll, allChats, openModal, setActiveChatId],
   );
 
   useLayoutEffect(() => {
@@ -1098,7 +1113,7 @@ export function CharactersPanel() {
                           toggleSelection(memberId);
                           return;
                         }
-                        openCharacterDetailFromPanel(memberId);
+                        openCharacterDetailFromPanel(memberId, memberName);
                       }}
                       onKeyDown={(e) => {
                         if (e.target !== e.currentTarget) return;
@@ -1108,7 +1123,7 @@ export function CharactersPanel() {
                           toggleSelection(memberId);
                           return;
                         }
-                        openCharacterDetailFromPanel(memberId);
+                        openCharacterDetailFromPanel(memberId, memberName);
                       }}
                       draggable
                       onDragStart={(event) => {
@@ -1336,20 +1351,13 @@ export function CharactersPanel() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openModal("start-character-chat", {
-                                characterId: memberId,
-                                characterName: memberName,
-                              });
+                              openCharacterDetail(memberId);
                             }}
-                            className="mari-chrome-control flex h-5 min-h-5 w-5 items-center justify-center rounded-md border-[var(--marinara-chat-chrome-button-border-active)] bg-[var(--marinara-chat-chrome-button-bg-active)] p-0 text-[var(--marinara-chat-chrome-button-text-active)] active:scale-90"
-                            title={localizeUi("ui.panels.characterspanel.startNewChatWithValue1", {
-                              value1: memberName,
-                            })}
-                            aria-label={localizeUi("ui.panels.characterspanel.startNewChatWithValue1", {
-                              value1: memberName,
-                            })}
+                            className="mari-chrome-control flex h-5 min-h-5 w-5 items-center justify-center rounded-md p-0 text-[var(--muted-foreground)] hover:text-[var(--primary)] active:scale-90"
+                            title={localizeUi("ui.noodle.ambientProfiles.edit")}
+                            aria-label={localizeUi("ui.noodle.ambientProfiles.edit")}
                           >
-                            <MessageCircle size="0.625rem" />
+                            <Pencil size="0.625rem" />
                           </button>
                           <button
                             type="button"
@@ -1448,7 +1456,7 @@ export function CharactersPanel() {
                 if (selectionMode) {
                   toggleSelection(char.id);
                 } else {
-                  openCharacterDetailFromPanel(char.id);
+                  openCharacterDetailFromPanel(char.id, charName);
                 }
               }}
               draggable
@@ -1671,20 +1679,13 @@ export function CharactersPanel() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openModal("start-character-chat", {
-                        characterId: char.id,
-                        characterName: charName,
-                      });
+                      openCharacterDetail(char.id);
                     }}
-                    className="mari-chrome-control mari-character-row-action flex w-7 items-center justify-center border-[var(--marinara-chat-chrome-button-border-active)] bg-[var(--marinara-chat-chrome-button-bg-active)] text-[var(--marinara-chat-chrome-button-text-active)] max-md:w-6"
-                    title={localizeUi("ui.panels.characterspanel.startNewChatWithValue1", {
-                      value1: charName,
-                    })}
-                    aria-label={localizeUi("ui.panels.characterspanel.startNewChatWithValue1", {
-                      value1: charName,
-                    })}
+                    className="mari-chrome-control mari-character-row-action flex w-7 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--primary)] max-md:w-6"
+                    title={localizeUi("ui.noodle.ambientProfiles.edit")}
+                    aria-label={localizeUi("ui.noodle.ambientProfiles.edit")}
                   >
-                    <MessageCircle className="h-3.5 w-3.5 shrink-0 max-md:h-3 max-md:w-3" />
+                    <Pencil className="h-3.5 w-3.5 shrink-0 max-md:h-3 max-md:w-3" />
                   </button>
                 </div>
               )}

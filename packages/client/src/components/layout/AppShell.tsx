@@ -1456,43 +1456,43 @@ export function AppShell() {
             </motion.aside>
           )}
         </AnimatePresence>
-        ) : (
-          <AnimatePresence initial={false}>
-            {rightPanelOpen && (
-              <motion.aside
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: liveRightPanelWidth, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ type: "spring", damping: 30, stiffness: 400 }}
-                data-component="RightPanelDesktopSlot"
-                aria-label={localizeUi("ui.layout.appshell.settingsAndToolsPanel")}
+      ) : (
+        <AnimatePresence initial={false}>
+          {rightPanelOpen && (
+            <motion.aside
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: liveRightPanelWidth, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 400 }}
+              data-component="RightPanelDesktopSlot"
+              aria-label={localizeUi("ui.layout.appshell.settingsAndToolsPanel")}
+              aria-hidden={!rightPanelOpen}
+              inert={!rightPanelOpen}
+              className={cn(
+                "mari-shell-panel-slot relative flex-shrink-0 overflow-hidden",
+                rightPanelDragWidth != null && "!transition-none",
+              )}
+              style={
+                {
+                  "--mari-right-panel-width": `${liveRightPanelWidth}px`,
+                } as CSSProperties
+              }
+            >
+              <div
+                data-component="RightPanelDesktop"
                 aria-hidden={!rightPanelOpen}
                 inert={!rightPanelOpen}
-                className={cn(
-                  "mari-shell-panel-slot relative flex-shrink-0 overflow-hidden",
-                  rightPanelDragWidth != null && "!transition-none",
-                )}
-                style={
-                  {
-                    "--mari-right-panel-width": `${liveRightPanelWidth}px`,
-                  } as CSSProperties
-                }
+                className="mari-right-panel mari-shell-panel-edge mari-shell-panel-edge--left absolute inset-y-0 right-0 overflow-hidden bg-[var(--background)]/95"
+                style={{ width: liveRightPanelWidth }}
               >
-                <div
-                  data-component="RightPanelDesktop"
-                  aria-hidden={!rightPanelOpen}
-                  inert={!rightPanelOpen}
-                  className="mari-right-panel mari-shell-panel-edge mari-shell-panel-edge--left absolute inset-y-0 right-0 overflow-hidden bg-[var(--background)]/95"
-                  style={{ width: liveRightPanelWidth }}
-                >
-                  <Suspense fallback={<SidePanelFallback />}>
-                    <RightPanel />
-                  </Suspense>
-                </div>
-              </motion.aside>
-            )}
-          </AnimatePresence>
-        )}
+                <Suspense fallback={<SidePanelFallback />}>
+                  <RightPanel />
+                </Suspense>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+      )}
 
       {!shellOverlayMode && rightPanelOpen && (
         <div

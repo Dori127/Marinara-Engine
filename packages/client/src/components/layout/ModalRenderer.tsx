@@ -173,6 +173,7 @@ export function ModalRenderer() {
           onClose={closeModal}
           characterId={(modal?.props?.characterId as string) ?? ""}
           characterName={(modal?.props?.characterName as string) ?? ""}
+          onDeleteChatId={modal?.props?.onDeleteChatId as string | undefined}
         />
       );
       break;
