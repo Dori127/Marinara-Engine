@@ -2,7 +2,6 @@
 // Layout: Chat Sidebar (polished with rich buttons)
 // ──────────────────────────────────────────────
 import {
-  MessageSquareText,
   Search,
   Trash2,
   Plus,
@@ -10,7 +9,6 @@ import {
   Download,
   GitBranch,
   AlertTriangle,
-  X,
   Circle,
   Moon,
   MinusCircle,
@@ -207,14 +205,6 @@ const MODE_CONFIG: Record<
   },
 };
 
-function ChatSidebarTitleIcon() {
-  return (
-    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[linear-gradient(135deg,#4de5dd_0%,#eb8951_52%,#e15c8c_100%)] text-white shadow-sm">
-      <MessageSquareText size="0.875rem" strokeWidth={2.35} />
-    </div>
-  );
-}
-
 export function ChatSidebar({ characterFilterId }: { characterFilterId?: string }) {
   const { t: localizeUi } = useUiTranslation();
   const { t } = useTranslation();
@@ -331,7 +321,10 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
   const modeChats = useMemo(
     () =>
       (chats ?? []).filter(
-        (chat) => chat.mode === activeTab && !(chat.mode === "conversation" && chat.metadata?.gameId) && (!characterFilterId || chat.characterIds?.includes(characterFilterId)),
+        (chat) =>
+          chat.mode === activeTab &&
+          !(chat.mode === "conversation" && chat.metadata?.gameId) &&
+          (!characterFilterId || chat.characterIds?.includes(characterFilterId)),
       ),
     [chats, activeTab, characterFilterId],
   );
@@ -690,15 +683,15 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
 
       // 3. Name format: Date@Time
       const date = new Date();
-      const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}@${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}@${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}`;
       const chatName = formattedDate;
 
       // 4. Find the last persona used with this character
       let lastPersonaId: string | null | undefined = undefined;
       if (chats) {
-        const charChats = chats.filter(c => c.characterIds?.includes(characterFilterId));
+        const charChats = chats.filter((c) => c.characterIds?.includes(characterFilterId));
         charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        const lastChatWithPersona = charChats.find(c => c.personaId);
+        const lastChatWithPersona = charChats.find((c) => c.personaId);
         if (lastChatWithPersona) {
           lastPersonaId = lastChatWithPersona.personaId;
         }
@@ -907,35 +900,42 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
   );
 
   // ── Batch actions ──
-  const performChatDelete = useCallback((chatId: string, chatMode?: string) => {
-    if (activeChatId === chatId && characterFilterId && chatMode) {
-      const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId);
-      if (charChats.length === 0) {
-        useUIStore.getState().openModal("start-character-chat", {
-          characterId: characterFilterId,
-          characterName: charLookup.get(characterFilterId)?.name ?? "Unnamed",
-          onDeleteChatId: chatId,
-        });
-        return;
-      }
-    }
-
-    deleteChat.mutate({ id: chatId, force: true });
-    
-    if (activeChatId === chatId) {
-      if (!characterFilterId || !chatMode) {
-        setActiveChatId(null);
-      } else {
-        const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId);
-        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        if (charChats.length > 0) {
-          setActiveChatId(charChats[0].id);
-        } else {
-          setActiveChatId(null);
+  const performChatDelete = useCallback(
+    (chatId: string, chatMode?: string) => {
+      if (activeChatId === chatId && characterFilterId && chatMode) {
+        const charChats = (chats ?? []).filter(
+          (c) => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId,
+        );
+        if (charChats.length === 0) {
+          useUIStore.getState().openModal("start-character-chat", {
+            characterId: characterFilterId,
+            characterName: charLookup.get(characterFilterId)?.name ?? "Unnamed",
+            onDeleteChatId: chatId,
+          });
+          return;
         }
       }
-    }
-  }, [activeChatId, characterFilterId, chats, charLookup, deleteChat, setActiveChatId]);
+
+      deleteChat.mutate({ id: chatId, force: true });
+
+      if (activeChatId === chatId) {
+        if (!characterFilterId || !chatMode) {
+          setActiveChatId(null);
+        } else {
+          const charChats = (chats ?? []).filter(
+            (c) => c.characterIds?.includes(characterFilterId) && c.mode === chatMode && c.id !== chatId,
+          );
+          charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          if (charChats.length > 0) {
+            setActiveChatId(charChats[0].id);
+          } else {
+            setActiveChatId(null);
+          }
+        }
+      }
+    },
+    [activeChatId, characterFilterId, chats, charLookup, deleteChat, setActiveChatId],
+  );
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedChatIds.size === 0) return;
@@ -952,16 +952,16 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
     ) {
       return;
     }
-      for (const id of selectedChatIds) {
-        if (id === activeChatId) {
-          const activeChatMode = chats?.find(c => c.id === activeChatId)?.mode;
-          performChatDelete(id, activeChatMode);
-        } else {
-          deleteChat.mutate({ id, force: true });
-        }
+    for (const id of selectedChatIds) {
+      if (id === activeChatId) {
+        const activeChatMode = chats?.find((c) => c.id === activeChatId)?.mode;
+        performChatDelete(id, activeChatMode);
+      } else {
+        deleteChat.mutate({ id, force: true });
       }
-      exitMultiSelect();
-    }, [selectedChatIds, deleteChat, activeChatId, performChatDelete, chats, exitMultiSelect, localizeUi]);
+    }
+    exitMultiSelect();
+  }, [selectedChatIds, deleteChat, activeChatId, performChatDelete, chats, exitMultiSelect, localizeUi]);
 
   const handleBatchExport = useCallback(async () => {
     if (selectedChatIds.size === 0) return;
@@ -1336,16 +1336,16 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
                   branchCount,
                 });
               } else {
-                  if (
-                    await showConfirmDialog({
-                      title:localizeUi("ui.layout.chatsidebar.deleteChat"),
-                      message: localizeUi("dialog.delete.namedPermanent", { name: chat.name }),
-                      confirmLabel:localizeUi("lorebook.editor.batch.delete"),
-                      tone: "destructive",
-                    })
-                  ) {
-                    performChatDelete(chat.id, chat.mode);
-                  }
+                if (
+                  await showConfirmDialog({
+                    title: localizeUi("ui.layout.chatsidebar.deleteChat"),
+                    message: localizeUi("dialog.delete.namedPermanent", { name: chat.name }),
+                    confirmLabel: localizeUi("lorebook.editor.batch.delete"),
+                    tone: "destructive",
+                  })
+                ) {
+                  performChatDelete(chat.id, chat.mode);
+                }
               }
             }}
             className="shrink-0 rounded-md p-1 text-[var(--muted-foreground)] opacity-0 transition-all hover:bg-[var(--accent)] hover:text-[var(--foreground)] group-hover:opacity-100 max-md:opacity-100"
@@ -1363,26 +1363,6 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
       aria-label={localize("Chat navigation")}
       className="mari-chat-sidebar mari-chrome-token-scope flex h-full flex-col"
     >
-      {/* Header */}
-      <div className="mari-sidebar-header relative flex h-12 items-center justify-between bg-[var(--card)]/80 px-4 backdrop-blur-sm">
-        <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--border)]/30" />
-        <div className="flex min-w-0 items-center gap-2.5">
-          <ChatSidebarTitleIcon />
-          <h2 className="mari-chrome-text-strong truncate text-sm font-semibold">{localize("Chats")}</h2>
-        </div>
-        <div className="flex min-w-0 shrink-0 items-center gap-1">
-          <PersonalExtensionContributionSlot surface="chats" position="header" className="max-w-28" />
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="mari-chrome-control mari-chrome-control--small mari-accent-animated p-1.5 active:scale-90 md:hidden"
-            title={localize("Close")}
-            aria-label={localize("Close chats")}
-          >
-            <X size="0.875rem" />
-          </button>
-        </div>
-      </div>
-
       <PersonalExtensionContributionSlot
         surface="chats"
         position="before-content"
@@ -1396,7 +1376,7 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
             const cfg = MODE_CONFIG[tab];
             const isActive = activeTab === tab;
             const tabUnread =
-              chats?.filter((c) => c.mode === tab).reduce((sum, c) => sum + (unreadCounts.get(c.id) || 0), 0) ?? 0;
+              chats?.filter((c) => c.mode === tab && (!characterFilterId || c.characterIds?.includes(characterFilterId))).reduce((sum, c) => sum + (unreadCounts.get(c.id) || 0), 0) ?? 0;
             return (
               <button
                 key={tab}
@@ -1763,39 +1743,44 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
                 })}
               </p>
             </div>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    const deletedChatMode = chats?.find(c => c.id === deleteTarget.chatId)?.mode;
-                    performChatDelete(deleteTarget.chatId, deletedChatMode);
-                    setDeleteTarget(null);
-                  }}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  const deletedChatMode = chats?.find((c) => c.id === deleteTarget.chatId)?.mode;
+                  performChatDelete(deleteTarget.chatId, deletedChatMode);
+                  setDeleteTarget(null);
+                }}
                 className="mari-chrome-control mari-chrome-control--primary w-full text-xs"
               >
                 <Trash2 size="0.8125rem" />
                 {localizeUi("ui.layout.chatsidebar.deleteThisBranchOnly")}
               </button>
-                <button
-                  onClick={() => {
-                    if (deleteTarget.groupId) {
-                      deleteChatGroup.mutate({ groupId: deleteTarget.groupId, force: true });
-                      if (activeGroupId === deleteTarget.groupId && activeChatId) {
-                        const activeChatMode = chats?.find(c => c.id === activeChatId)?.mode;
-                        if (characterFilterId && activeChatMode) {
-                          const charChats = (chats ?? []).filter(c => c.characterIds?.includes(characterFilterId) && c.mode === activeChatMode && c.groupId !== deleteTarget.groupId);
-                          charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                          if (charChats.length > 0) {
-                            setActiveChatId(charChats[0].id);
-                          } else {
-                            setActiveChatId(null);
-                          }
+              <button
+                onClick={() => {
+                  if (deleteTarget.groupId) {
+                    deleteChatGroup.mutate({ groupId: deleteTarget.groupId, force: true });
+                    if (activeGroupId === deleteTarget.groupId && activeChatId) {
+                      const activeChatMode = chats?.find((c) => c.id === activeChatId)?.mode;
+                      if (characterFilterId && activeChatMode) {
+                        const charChats = (chats ?? []).filter(
+                          (c) =>
+                            c.characterIds?.includes(characterFilterId) &&
+                            c.mode === activeChatMode &&
+                            c.groupId !== deleteTarget.groupId,
+                        );
+                        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                        if (charChats.length > 0) {
+                          setActiveChatId(charChats[0].id);
                         } else {
                           setActiveChatId(null);
                         }
+                      } else {
+                        setActiveChatId(null);
                       }
                     }
-                    setDeleteTarget(null);
-                  }}
+                  }
+                  setDeleteTarget(null);
+                }}
                 className="mari-chrome-control mari-chrome-control--primary w-full text-xs"
               >
                 <Trash2 size="0.8125rem" />
