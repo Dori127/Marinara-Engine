@@ -108,7 +108,16 @@ export function TopBar() {
   const toggleChatPopup = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCharacterPopupOpen(false);
-    setIsChatPopupOpen(prev => !prev);
+
+    // If there is no active chat but we are toggling this, and we have a character selected
+    // It implies we should launch the setup wizard for the user to make a new chat
+    if (!activeChatId && currentCharacterId && !isChatPopupOpen) {
+      useChatStore.getState().setShouldOpenWizard(true);
+      useChatStore.getState().setShouldOpenWizardInShortcutMode(false);
+      useChatStore.getState().setShouldOpenSettings(false);
+    }
+
+    setIsChatPopupOpen((prev) => !prev);
   };
 
   const closePopups = useCallback(() => {

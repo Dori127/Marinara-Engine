@@ -2,10 +2,9 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api-client";
 import { useChatStore } from "../stores/chat.store";
-import { chatKeys, useCreateChat, useChats } from "./use-chats";
+import { chatKeys, useCreateChat } from "./use-chats";
 import { useApplyChatPreset, useChatPresets } from "./use-chat-presets";
 import { addSilentGreetingSwipes } from "../lib/message-swipes";
-import { useActivePersona } from "./use-characters";
 
 type ChatMode = "roleplay" | "conversation" | "game";
 
@@ -24,8 +23,6 @@ export function useStartChatFromCharacter() {
   const queryClient = useQueryClient();
   const { data: chatPresetsData } = useChatPresets();
   const applyChatPreset = useApplyChatPreset();
-  const { data: chats } = useChats();
-  const { data: activePersona } = useActivePersona();
 
   const startChatFromCharacter = useCallback(
     ({
@@ -40,56 +37,29 @@ export function useStartChatFromCharacter() {
       const label = mode === "conversation" ? "Conversation" : mode === "game" ? "Game" : "Roleplay";
       const presets = chatPresetsData ?? [];
       const presetMode = mode === "conversation" || mode === "roleplay" ? mode : null;
-      const defaultPreset = presetMode ? presets.find((p) => p.mode === presetMode && p.isDefault) : null;
       const starred = presetMode
         ? presets.find((preset) => preset.mode === presetMode && preset.isActive && !preset.isDefault)
         : null;
-
-      let hasPreviousHistory = false;
-      let lastPersonaId: string | null | undefined = undefined;
-      
-      if (chats) {
-        const charChats = chats.filter((c) => c.characterIds?.includes(characterId));
-        charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        
-        hasPreviousHistory = charChats.some((c) => c.mode === mode);
-        
-        const lastChatWithPersona = charChats.find((c) => c.personaId);
-        if (lastChatWithPersona) {
-          lastPersonaId = lastChatWithPersona.personaId;
-        }
-      }
-
-      const personaIdToUse = hasPreviousHistory ? (activePersona?.id ?? null) : lastPersonaId;
-      const finalPromptPresetId = hasPreviousHistory ? defaultPreset?.id : (starred?.settings.promptPresetId ?? undefined);
 
       createChat.mutate(
         {
           name: characterName ? `${characterName} - ${label}` : `New ${label}`,
           mode,
           characterIds: [characterId],
-          connectionId: hasPreviousHistory ? undefined : (starred?.settings.connectionId ?? undefined),
-          promptPresetId: finalPromptPresetId,
-          personaId: personaIdToUse,
+          connectionId: starred?.settings.connectionId ?? undefined,
+          promptPresetId: starred?.settings.promptPresetId ?? undefined,
         },
         {
           onSuccess: (chat) => {
             const store = useChatStore.getState();
             store.setActiveChatId(chat.id);
-            
-            if (!hasPreviousHistory) {
-              store.setShouldOpenSettings(true);
-              store.setShouldOpenWizard(true);
-              store.setShouldOpenWizardInShortcutMode(shortcutMode && mode === "roleplay");
-            } else {
-              store.setShouldOpenSettings(false);
-              store.setShouldOpenWizard(false);
-            }
-            
+            store.setShouldOpenSettings(true);
+            store.setShouldOpenWizard(true);
+            store.setShouldOpenWizardInShortcutMode(shortcutMode && mode === "roleplay");
             onSuccess?.(chat.id);
 
             void (async () => {
-              if (starred && !hasPreviousHistory) {
+              if (starred) {
                 try {
                   await applyChatPreset.mutateAsync({ presetId: starred.id, chatId: chat.id });
                 } catch {
@@ -119,7 +89,7 @@ export function useStartChatFromCharacter() {
         },
       );
     },
-    [applyChatPreset, chatPresetsData, createChat, queryClient, chats, activePersona],
+    [applyChatPreset, chatPresetsData, createChat, queryClient],
   );
 
   return {

@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { GripVertical, Music2, Sparkles, X } from "lucide-react";
+import { GripVertical, Music2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useUIStore } from "../../stores/ui.store";
 import { useTranslation as useUiTranslation } from "react-i18next";
@@ -86,8 +86,6 @@ export function MusicDjUnavailablePlayer({
   mobileOnly?: boolean;
 }) {
   const { t: localizeUi } = useUiTranslation();
-  const openRightPanel = useUIStore((state) => state.openRightPanel);
-  const openAgentCatalog = useUIStore((state) => state.openAgentCatalog);
   const agentCatalogOpen = useUIStore((state) => state.agentCatalogOpen);
   const collapsed = useUIStore((state) => state.spotifyMobileWidgetCollapsed);
   const setCollapsed = useUIStore((state) => state.setSpotifyMobileWidgetCollapsed);
@@ -122,11 +120,6 @@ export function MusicDjUnavailablePlayer({
       window.removeEventListener("orientationchange", refreshViewport);
     };
   }, [collapsed, mobileOnly, mobilePosition.x, mobilePosition.y, setMobilePosition]);
-
-  const openDownloadAgents = () => {
-    openRightPanel("agents");
-    openAgentCatalog();
-  };
 
   const startDrag = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -241,15 +234,6 @@ export function MusicDjUnavailablePlayer({
               <span className="min-w-0 flex-1 text-[0.6875rem] leading-tight text-[var(--marinara-music-player-text)]">
                 {localizeUi("ui.music.musicdjunavailableplayer.downloadMusicDjAgentToConfigure")}
               </span>
-              <button
-                type="button"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={openDownloadAgents}
-                className="mari-chrome-control mari-chrome-control--primary mari-chrome-control--compact shrink-0 gap-1.5 whitespace-nowrap"
-              >
-                <Sparkles size="0.75rem" />
-                {localizeUi("ui.agents.agentcatalogview.downloadAgents")}
-              </button>
             </div>
           </div>
         )}
@@ -271,14 +255,6 @@ export function MusicDjUnavailablePlayer({
       <span className="min-w-0 flex-1 text-[0.6875rem] leading-tight text-[var(--marinara-music-player-text)]">
         {localizeUi("ui.music.musicdjunavailableplayer.downloadMusicDjAgentToConfigure")}
       </span>
-      <button
-        type="button"
-        onClick={openDownloadAgents}
-        className="mari-chrome-control mari-chrome-control--primary mari-chrome-control--compact shrink-0 gap-1.5 whitespace-nowrap"
-      >
-        <Sparkles size="0.75rem" />
-        {localizeUi("ui.agents.agentcatalogview.downloadAgents")}
-      </button>
     </div>
   );
 }

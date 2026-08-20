@@ -35,7 +35,7 @@ import {
   useReorderFolders,
   useMoveChat,
 } from "../../hooks/use-chat-folders";
-import { useCharacterSummaries, useActivePersona } from "../../hooks/use-characters";
+import { useCharacterSummaries } from "../../hooks/use-characters";
 import { handleFolderRenameKeyDown, useFolderRenameGesture } from "../../hooks/use-folder-rename-gesture";
 import { useChatStore } from "../../stores/chat.store";
 import { confirmNonEmptyFolderDelete, showConfirmDialog } from "../../lib/app-dialogs";
@@ -336,7 +336,6 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
     return Array.from(ids);
   }, [chats]);
   const { data: characterSummaries } = useCharacterSummaries(sidebarCharacterIds);
-  const { data: activePersona } = useActivePersona();
 
   // Build character lookup: id → { name, avatarUrl, avatarCrop, conversationStatus }
   const charLookup = useMemo(() => {
@@ -689,20 +688,14 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
 
       // 4. Find the last persona used with this character
       let lastPersonaId: string | null | undefined = undefined;
-      let hasPreviousHistory = false;
       if (chats) {
         const charChats = chats.filter((c) => c.characterIds?.includes(characterFilterId));
         charChats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        
-        hasPreviousHistory = charChats.some((c) => c.mode === mode);
-        
         const lastChatWithPersona = charChats.find((c) => c.personaId);
         if (lastChatWithPersona) {
           lastPersonaId = lastChatWithPersona.personaId;
         }
       }
-
-      const personaIdToUse = hasPreviousHistory ? (activePersona?.id ?? null) : lastPersonaId;
 
       // Create the chat without showing any setup popup (except enable agents wizard logic if needed)
       createChat.mutate(
@@ -712,21 +705,15 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
           characterIds: [characterFilterId],
           connectionId: undefined, // "connection should be the main default"
           promptPresetId: defaultPreset?.id,
-          personaId: personaIdToUse,
+          personaId: lastPersonaId,
         },
         {
           onSuccess: (chat) => {
             const store = useChatStore.getState();
             store.setActiveChatId(chat.id);
-            
-            if (!hasPreviousHistory) {
-              // The prompt asks for "the only popup that should remain is the enable agents."
-              store.setShouldOpenWizard(true);
-              store.setShouldOpenWizardInShortcutMode(false);
-            } else {
-              store.setShouldOpenWizard(false);
-            }
-            
+            // The prompt asks for "the only popup that should remain is the enable agents."
+            store.setShouldOpenWizard(true);
+            store.setShouldOpenWizardInShortcutMode(false);
             // Settings drawer is omitted because user said "no popup should come up... the only popup that should remain is the enable agents"
             store.setShouldOpenSettings(false);
             if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
@@ -734,19 +721,18 @@ export function ChatSidebar({ characterFilterId }: { characterFilterId?: string 
         },
       );
     },
-      [
-        createChat,
-        connections,
-        setPendingNewChatMode,
-        hasAnyDetailOpen,
-        closeAllDetails,
-        chatPresetsData,
-        setSidebarOpen,
-        characterFilterId,
-        charLookup,
-        chats,
-        activePersona,
-      ],
+    [
+      createChat,
+      connections,
+      setPendingNewChatMode,
+      hasAnyDetailOpen,
+      closeAllDetails,
+      chatPresetsData,
+      setSidebarOpen,
+      characterFilterId,
+      charLookup,
+      chats,
+    ],
   );
 
   const handleNewChatFromTab = useCallback(() => {
