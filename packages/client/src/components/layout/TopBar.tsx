@@ -12,7 +12,10 @@ import { LocalMusicPlayer } from "../chat/LocalMusicPlayer";
 import { MusicDjUnavailablePlayer } from "../music/MusicDjUnavailablePlayer";
 import { useInstalledCapabilityPackages } from "../../hooks/use-capability-packages";
 import { useLocalizedUiText } from "../../localization/use-localized-ui-text";
-import { PersonalExtensionContributionsMenu, PersonalExtensionTopbarButtons } from "./PersonalExtensionContributionsMenu";
+import {
+  PersonalExtensionContributionsMenu,
+  PersonalExtensionTopbarButtons,
+} from "./PersonalExtensionContributionsMenu";
 import { useCharacters } from "../../hooks/use-characters";
 import { ChatSidebar } from "./ChatSidebar";
 import { CharactersPanel } from "../panels/CharactersPanel";
@@ -49,7 +52,7 @@ export function TopBar() {
   const setActiveChatId = useChatStore((s) => s.setActiveChatId);
   const activeChat = useChatStore((s) => s.activeChat);
   const closeAllDetails = useUIStore((s) => s.closeAllDetails);
-  
+
   const characterDetailId = useUIStore((s) => s.characterDetailId);
   const characterLibraryOpen = useUIStore((s) => s.characterLibraryOpen);
   const activeModal = useUIStore((s) => s.modal);
@@ -58,67 +61,54 @@ export function TopBar() {
   const [spotifyDesktopViewport, setSpotifyDesktopViewport] = useState(false);
   const [spotifyUseFloatingFallback, setSpotifyUseFloatingFallback] = useState(false);
   const [hoveredTopbarKey, setHoveredTopbarKey] = useState<string | null>(null);
-  
-  const { data: installedCapabilities = [], isLoading: installedCapabilitiesLoading } = useInstalledCapabilityPackages();
-  const musicPlayerEnabled = useUIStore((s) => s.musicPlayerEnabled);
-  const musicDjInstalled = installedCapabilities.some((capability) => capability.id === "spotify" && capability.status === "active");
-  const showMusicDjUnavailablePlayer = spotifyDesktopViewport && musicPlayerEnabled && !installedCapabilitiesLoading && !musicDjInstalled;
 
-  const isHomeActive =
-    !activeChatId &&
-    !characterDetailId &&
-    !activeModal &&
-    !characterLibraryOpen;
+  const { data: installedCapabilities = [], isLoading: installedCapabilitiesLoading } =
+    useInstalledCapabilityPackages();
+  const musicPlayerEnabled = useUIStore((s) => s.musicPlayerEnabled);
+  const musicDjInstalled = installedCapabilities.some(
+    (capability) => capability.id === "spotify" && capability.status === "active",
+  );
+  const showMusicDjUnavailablePlayer =
+    spotifyDesktopViewport && musicPlayerEnabled && !installedCapabilitiesLoading && !musicDjInstalled;
+
+  const isHomeActive = !activeChatId && !characterDetailId && !activeModal && !characterLibraryOpen;
 
   const isTopbarHovered = (key: string) => hoveredTopbarKey === key;
 
   // Popups state
   const [isCharacterPopupOpen, setIsCharacterPopupOpen] = useState(false);
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
-  
+
   // Chat / Character lists
   const { data: rawCharactersData = [] } = useCharacters();
   const charactersData = rawCharactersData as Array<{ id: string; data?: any; avatarPath?: string | null }>;
-  
+
   const currentCharacterId = activeChat?.characterIds?.[0];
-  const currentCharacter = charactersData.find(c => c.id === currentCharacterId);
+  const currentCharacter = charactersData.find((c) => c.id === currentCharacterId);
   let currentCharacterName = "Select Character";
   try {
     if (currentCharacter) {
-      const currentCharacterParsed = typeof currentCharacter.data === "string" ? JSON.parse(currentCharacter.data) : currentCharacter.data;
+      const currentCharacterParsed =
+        typeof currentCharacter.data === "string" ? JSON.parse(currentCharacter.data) : currentCharacter.data;
       currentCharacterName = currentCharacterParsed?.name ?? currentCharacterName;
     }
   } catch {
     // Ignore parse error
   }
-  
+
   const currentChatModeStr = activeChat ? REVERSE_MODE_MAP[activeChat.mode] : "---";
   const currentChatName = activeChat?.name ?? "No Chat Active";
 
   const toggleCharacterPopup = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsChatPopupOpen(false);
-    setIsCharacterPopupOpen(prev => !prev);
+    setIsCharacterPopupOpen((prev) => !prev);
   };
 
   const toggleChatPopup = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCharacterPopupOpen(false);
-
-    // If there is no active chat but we are toggling this, and we have a character selected
-    // It implies we should launch the setup wizard for the user to make a new chat
-    if (!activeChatId && currentCharacterId && !isChatPopupOpen) {
-      const { chats } = useChatStore.getState();
-      const charChats = (chats ?? []).filter((c) => c.characterIds?.includes(currentCharacterId));
-
-      if (charChats.length === 0) {
-        useChatStore.getState().setShouldOpenWizard(true);
-        useChatStore.getState().setShouldOpenWizardInShortcutMode(false);
-        useChatStore.getState().setShouldOpenSettings(false);
-      }
-    }
-
-    setIsChatPopupOpen((prev) => !prev);
+    setIsChatPopupOpen(prev => !prev);
   };
 
   const closePopups = useCallback(() => {
@@ -144,10 +134,13 @@ export function TopBar() {
 
   const clearTopbarHover = useCallback(() => setHoveredTopbarKey(null), []);
 
-  const handleRightPanelClick = useCallback((panel: Parameters<typeof toggleRightPanel>[0]) => {
-    prepareMobileTopbarNavigation();
-    toggleRightPanel(panel);
-  }, [prepareMobileTopbarNavigation, toggleRightPanel]);
+  const handleRightPanelClick = useCallback(
+    (panel: Parameters<typeof toggleRightPanel>[0]) => {
+      prepareMobileTopbarNavigation();
+      toggleRightPanel(panel);
+    },
+    [prepareMobileTopbarNavigation, toggleRightPanel],
+  );
 
   useEffect(() => {
     const handleDocumentClick = () => closePopups();
@@ -167,14 +160,14 @@ export function TopBar() {
         setSpotifyUseFloatingFallback(false);
         return;
       }
-      
+
       const minPlayerWidth = window.matchMedia("(min-width: 1024px)").matches
         ? SPOTIFY_TOPBAR_MIN_WIDTH_WITH_VOLUME
         : SPOTIFY_TOPBAR_MIN_WIDTH;
 
       const rightNavWidth = 150; // approximate
       const leftNavWidth = 520; // approximate width of character and chat buttons
-      
+
       const headerWidth = header.getBoundingClientRect().width;
       setSpotifyUseFloatingFallback(
         headerWidth < leftNavWidth + rightNavWidth + minPlayerWidth + SPOTIFY_TOPBAR_LAYOUT_BUFFER,
@@ -219,39 +212,42 @@ export function TopBar() {
       onPointerOver={handleTopbarPointerOver}
       className="mari-topbar mari-new-top-bar"
     >
-      <div className={cn("mari-new-backdrop", (isCharacterPopupOpen || isChatPopupOpen) && "active")} onClick={closePopups} />
+      <div
+        className={cn("mari-new-backdrop", (isCharacterPopupOpen || isChatPopupOpen) && "active")}
+        onClick={closePopups}
+      />
 
       {/* Left controls: Home */}
       <div className="relative z-[999] flex shrink-0 items-center gap-2 pr-2 border-r border-[var(--border)]">
-          <button
-            onClick={() => {
-              window.dispatchEvent(new Event("marinara:home-professor-mari-close"));
-              setActiveChatId(null);
-              closeAllDetails();
-            }}
-            data-topbar-hover-key="home"
-            className={cn(
-              TOPBAR_BUTTON_CLASS,
-              isHomeActive
-                ? TOPBAR_ACTIVE_BUTTON_CLASS
-                : cn(
-                    "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]",
-                    isTopbarHovered("home") &&
-                      cn(TOPBAR_FORCE_HOVER_CLASS, "text-[var(--marinara-chat-chrome-button-text-hover)]"),
-                  ),
-            )}
-            title={localize("Home")}
-          >
-            <Home size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
-            {isHomeActive && (
-              <span className="mari-topbar-active-underline absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full" />
-            )}
-          </button>
+        <button
+          onClick={() => {
+            window.dispatchEvent(new Event("marinara:home-professor-mari-close"));
+            setActiveChatId(null);
+            closeAllDetails();
+          }}
+          data-topbar-hover-key="home"
+          className={cn(
+            TOPBAR_BUTTON_CLASS,
+            isHomeActive
+              ? TOPBAR_ACTIVE_BUTTON_CLASS
+              : cn(
+                  "text-[var(--muted-foreground)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]",
+                  isTopbarHovered("home") &&
+                    cn(TOPBAR_FORCE_HOVER_CLASS, "text-[var(--marinara-chat-chrome-button-text-hover)]"),
+                ),
+          )}
+          title={localize("Home")}
+        >
+          <Home size={15} className={TOPBAR_ACCENT_ICON_CLASS} />
+          {isHomeActive && (
+            <span className="mari-topbar-active-underline absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full" />
+          )}
+        </button>
       </div>
 
       {/* Character Button */}
-      <div 
-        className={cn("mari-new-top-bar-btn character-btn", isCharacterPopupOpen && "active")} 
+      <div
+        className={cn("mari-new-top-bar-btn character-btn", isCharacterPopupOpen && "active")}
         onClick={toggleCharacterPopup}
       >
         <div className="mari-new-character-avatar">
@@ -264,35 +260,44 @@ export function TopBar() {
           )}
         </div>
         <div className="mari-new-btn-text-container">
-          <span className="mari-new-truncated-text" title={currentCharacterName}>{currentCharacterName}</span>
+          <span className="mari-new-truncated-text" title={currentCharacterName}>
+            {currentCharacterName}
+          </span>
         </div>
 
         {/* Character Popup */}
-        <div className={cn("mari-new-popup", isCharacterPopupOpen && "active")} onClick={(e) => e.stopPropagation()} style={{ height: "600px", padding: 0, overflow: "hidden" }}>
-            <CharactersPanel />
+        <div
+          className={cn("mari-new-popup", isCharacterPopupOpen && "active")}
+          onClick={(e) => e.stopPropagation()}
+          style={{ height: "600px", padding: 0, overflow: "hidden" }}
+        >
+          <CharactersPanel />
         </div>
       </div>
 
       {/* Chat Mode Button */}
-      <div 
-        className={cn("mari-new-top-bar-btn chat-btn", isChatPopupOpen && "active")} 
-        onClick={toggleChatPopup}
-      >
+      <div className={cn("mari-new-top-bar-btn chat-btn", isChatPopupOpen && "active")} onClick={toggleChatPopup}>
         <div className="mari-new-btn-text-container">
-            <span className="mari-new-chat-mode-label">{currentChatModeStr}</span>
-            <span className="mari-new-chat-separator">|</span>
-            <span className="mari-new-truncated-text" title={currentChatName}>{currentChatName}</span>
+          <span className="mari-new-chat-mode-label">{currentChatModeStr}</span>
+          <span className="mari-new-chat-separator">|</span>
+          <span className="mari-new-truncated-text" title={currentChatName}>
+            {currentChatName}
+          </span>
         </div>
 
         {/* Chat Popup */}
-        <div className={cn("mari-new-popup", isChatPopupOpen && "active")} onClick={(e) => e.stopPropagation()} style={{ height: "600px", padding: 0, overflow: "hidden" }}>
-            <ChatSidebar characterFilterId={currentCharacterId} />
+        <div
+          className={cn("mari-new-popup", isChatPopupOpen && "active")}
+          onClick={(e) => e.stopPropagation()}
+          style={{ height: "600px", padding: 0, overflow: "hidden" }}
+        >
+          <ChatSidebar characterFilterId={currentCharacterId} />
         </div>
       </div>
 
       <div className="relative z-[999] flex-1 flex justify-center min-w-0">
         {showMusicDjUnavailablePlayer ? (
-          <MusicDjUnavailablePlayer floating={spotifyUseFloatingFallback} />
+          !spotifyUseFloatingFallback && <MusicDjUnavailablePlayer />
         ) : musicDjInstalled ? (
           <>
             {spotifyDesktopViewport && <SpotifyMiniPlayer forceFloating={spotifyUseFloatingFallback} />}
@@ -310,7 +315,7 @@ export function TopBar() {
       >
         <PersonalExtensionTopbarButtons />
         <PersonalExtensionContributionsMenu />
-        
+
         <button
           onClick={() => {
             if (rightPanelOpen) {
@@ -321,7 +326,9 @@ export function TopBar() {
           }}
           className={cn(
             TOPBAR_PANEL_BUTTON_CLASS,
-            rightPanelOpen ? cn(TOPBAR_ACTIVE_BUTTON_CLASS, "text-[var(--primary)]") : "text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+            rightPanelOpen
+              ? cn(TOPBAR_ACTIVE_BUTTON_CLASS, "text-[var(--primary)]")
+              : "text-[var(--muted-foreground)] hover:text-[var(--primary)]",
           )}
           title={localize("Menu")}
         >
